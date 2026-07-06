@@ -8,7 +8,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
 {
     #region Variables and callable functions
     a   =
-    {
+    { 
         instance        : _instance,
         target          : _target,
         cell_size       : _cell_size,
@@ -405,7 +405,7 @@ function _add_open_set (_struct, _gx = -1, _gy = -1)
         if (!_free_path(_struct, _n_gx, _n_gy))
             continue;
                
-        _movement_cost = (abs(_dir.dx) + abs(_dir.dy) == 2) ? 14 : 10; // Cost for diagonal movement (sqrt(2) * 10) or straight movement;
+        _movement_cost = (abs(_dir.dx) + abs(_dir.dy) == 2) ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
 
         var hn          = _struct.heuristic(_n_gx, _n_gy, _struct.target.x div _struct.cell_size, _struct.target.y div _struct.cell_size);
         var current_g   = _struct.g_cost[# _actual_gx, _actual_gy];
