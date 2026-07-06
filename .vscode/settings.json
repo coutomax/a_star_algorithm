@@ -1,0 +1,100 @@
+{
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": "keyword.control.gml",
+                "settings": {
+                    "foreground": "#00ff41",
+                    "fontStyle": "bold"
+                }
+            },
+            {
+                "scope": [
+                    "storage.type.gml",
+                    "storage.modifier.gml",
+                    "storage.type.class"
+                ],
+                "settings": {
+                    "foreground": "#39ff14",
+                    "fontStyle": "bold"
+                }
+            },
+            {
+                "scope": "storage.type.function.gml",
+                "settings": {
+                    "foreground": "#39ff14",
+                    "fontStyle": "bold"
+                }
+            },
+            {
+                "scope": "constant.language.gml",
+                "settings": {
+                    "foreground": "#7fff00"
+                }
+            },
+            {
+                "scope": "string.quoted.double.gml",
+                "settings": {
+                    "foreground": "#00aa22"
+                }
+            },
+            {
+                "scope": [
+                    "comment.line.double-slash.gml",
+                    "comment.line.triple-slash.gml",
+                    "comment.block.gml"
+                ],
+                "settings": {
+                    "foreground": "#004d00",
+                    "fontStyle": "italic"
+                }
+            },
+            {
+                "scope": "constant.numeric",
+                "settings": {
+                    "foreground": "#33ff66"
+                }
+            },
+            {
+                "scope": "entity.name.function.gml",
+                "settings": {
+                    "foreground": "#00ff80",
+                    "fontStyle": "bold"
+                }
+            },
+            {
+                "scope": "support.function.gml",
+                "settings": {
+                    "foreground": "#00cc33"
+                }
+            },
+            {
+                "scope": [
+                    "keyword.operator.arithmetic.gml",
+                    "keyword.operator.comparison.gml",
+                    "keyword.operator.logical.gml",
+                    "keyword.operator.assignment.gml",
+                    "keyword.operator.bitwise.gml",
+                    "keyword.operator.ternary.gml",
+                    "keyword.operator.new.gml"
+                ],
+                "settings": {
+                    "foreground": "#66ff66"
+                }
+            },
+            {
+                "scope": [
+                    "keyword.region.begin.gml",
+                    "keyword.region.end.gml"
+                ],
+                "settings": {
+                    "foreground": "#00ff41",
+                    "fontStyle": "bold underline"
+                }
+            }
+        ]
+    },
+    "workbench.colorCustomizations": {
+        "editor.background": "#000000"
+    }
+}
