@@ -4,5 +4,5 @@ if (toggle)
    
 }
 
-//a.print_benchmarks();
+a.print_timers();
 a.move_instance(move_speed);

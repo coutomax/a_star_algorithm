@@ -1,12 +1,19 @@
+
+#macro DIR_X_ALL [-1, 1, 0, 0, -1, 1, -1, 1]
+#macro DIR_Y_ALL [0, 0, -1, 1, -1, -1, 1, 1]
+
+#macro DIR_X_MANHATTAN [-1, 1, 0, 0]
+#macro DIR_Y_MANHATTAN [0, 0, -1, 1]
+
 /// @desc                   A* algorithm implementation for pathfinding in a grid-based environment.
 /// @param {Instance}       _instance Current instance that will be move towards the target.
 /// @param {Instance}       _target Target instance that the current instance will move towards.
 /// @param {Real}           _cell_size Size of each cell in the grid.
 /// @param {Array}          _obstacles Array of obstacle instances.
 /// @param {Boolean}        _active_debug Whether to enable debug messages.
-function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = manhattan, _active_debug = false)
+function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = manhattan)
 {
-    #region Variables and callable functions
+    #region Variable declarations and callable structure
     a   =
     { 
         instance        : _instance,
@@ -14,7 +21,6 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         cell_size       : _cell_size,
         obstacles       : _obstacles,
         heuristic       : _heuristic,
-        active_debug    : _active_debug,
         grid            : undefined,
         open_set        : undefined,
         closed_set      : undefined,
@@ -25,70 +31,91 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         grid_width      : 0,
         grid_height     : 0,
         f_cost          : 0,
+        operations      : 0,
+        goal_gx         : 0,
+        goal_gy         : 0,
         reached         : false,
         failure         : false,
-        operations      : 0,
+        timers          :
+            {
+                t0      : 0,
+                t1      : 0,
+                t2      : 0,
+                t3      : 0,
+                t4      : 0,
+                t5      : 0,
+                t6      : 0, 
+                t7      : 0, 
+                printed : false
+            },
 
         // @desc Initialize the A* algorithm with the provided parameters.
         init        : function ()
         {
-            gml_pragma("forceinline");
-            var _status = false;
+            timers.t0           = get_timer();
+            var _status         = false;
+            var _total_cells    = 0;
 
             if (instance == noone || target == noone) 
             {
-                debug_message("A* Error: Instance or target is noone.");
+                show_debug_message("A* Error: Instance or target is noone.");
                 return _status;
             }
 
             if (cell_size <= 0)
             {
-                debug_message("A* Error: Cell size must be greater than 0.");
+                show_debug_message("A* Error: Cell size must be greater than 0.");
                 return _status;
             }
 
             if (instance == target)
             {
-                debug_message("A* Error: Instance and target are the same.");
+                show_debug_message("A* Error: Instance and target are the same.");
                 return _status;
             }
 
             if (heuristic == undefined)
             {
-                debug_message("A* Error: Heuristic function is undefined.");
+                show_debug_message("A* Error: Heuristic function is undefined.");
                 return _status;
             }
 
             if (!is_callable(heuristic))
             {
-                debug_message("A* Error: Heuristic function is not callable.");
+                show_debug_message("A* Error: Heuristic function is not callable.");
                 return _status;
             }
 
             if (array_length(obstacles) == 0)
             {
-                debug_message("No obstacles provided. The grid will be created without any obstacles.");
-            }          
+                show_debug_message("No obstacles provided. The grid will be created without any obstacles.");
+            }      
 
             grid_width      = room_width div cell_size;
             grid_height     = room_height div cell_size;
-            open_set        = ds_priority_create();
 
-            // Create the grid with the specified width and height
-            grid            = ds_grid_create(grid_width, grid_height);
-            closed_set      = ds_grid_create(grid_width, grid_height); 
-            g_cost          = ds_grid_create(grid_width, grid_height);
-            parent          = ds_grid_create(grid_width, grid_height);
+            var _total_cells    = grid_width * grid_height;
+            var INF             = 1000000000; // A large value to represent infinity
 
-            ds_grid_clear(closed_set, false); // Initialize closed_set with false values
-            ds_grid_clear(parent, undefined); // Initialize parent with undefined values
-
-            var INF = 1000000000; // A large value to represent infinity
-            ds_grid_clear(g_cost, INF);
+            // Initialize the data structures
+            open_set    = ds_priority_create();
+            grid        = array_create(_total_cells, 0);
+            closed_set  = array_create(_total_cells, false);
+            parent      = array_create(_total_cells, undefined);
+            g_cost      = array_create(_total_cells, INF);
 
             var actual_location = _actual_location(self);
-            closed_set[# real(actual_location.gx), real(actual_location.gy)]    = true;
-            g_cost[# real(actual_location.gx), real(actual_location.gy)]        = 0;
+            var _start_gx       = real(actual_location.gx);
+            var _start_gy       = real(actual_location.gy);
+            var _start_index    = _start_gx + (_start_gy * grid_width);
+
+            ds_priority_add(open_set, _start_index, 0);
+
+            goal_gx        = target.x div cell_size;
+            goal_gy        = target.y div cell_size;
+
+            closed_set[_start_index]    = true;
+            g_cost[_start_index]        = 0;
 
             return !_status;
         },
@@ -97,11 +124,12 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         on_create    : function ()
         {
             if (!init()) return;
+
+            timers.t1   = get_timer();
             
             var actual_location = _actual_location(self);
 
             _grid_filler(self);
-            _add_open_set(self, actual_location.gx, actual_location.gy);
         },
 
         // @desc Called on Step Event. Steps through the A* algorithm until the target is reached or no path is found.
@@ -111,7 +139,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             if (open_set == undefined || ds_priority_empty(open_set)) return;
             if (reached) return;
 
-            a_star_runner(self);
+            a_star_runner(self);            
         },
         
         // @desc Called when the A* algorithm is activated. Steps through the algorithm one step at a time.
@@ -152,8 +180,26 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             if (ds_list_size(path) == 0)
             {
                 clear(self);
-                debug_message("A* Info: Instance has reached the target.");
             }
+        },
+
+        print_timers : function ()
+        {
+            if (timers.printed) return;
+
+            var _t_init = (timers.t1 - timers.t0) / 1000;
+            var _t_create = (timers.t3 - timers.t2) / 1000;
+            var _t_a_star = (timers.t5 - timers.t4) / 1000;
+            var _t_path_build = (timers.t7 - timers.t6) / 1000;
+
+            show_debug_message("A* Timers:");
+            show_debug_message("Initialization Time: " + string(_t_init) + " ms");
+            show_debug_message("Grid Filling Time: " + string(_t_create) + " ms");
+            show_debug_message("A* Execution Time: " + string(_t_a_star) + " ms");
+            show_debug_message("Path Building Time: " + string(_t_path_build) + " ms");
+            show_debug_message("Total Operations: " + string(operations));
+
+            timers.printed = true;
         },
 
         // @desc Clears the A* algorithm's data structures and resets the state.
@@ -228,10 +274,11 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             {
                 for (var _y = 0; _y < grid_height; _y++)
                 {
-                    var _px = _x * cell_size;
-                    var _py = _y * cell_size;
-                    var text = "(" + string(_x) + "," + string(_y) + ")";
-                    draw_text_transformed(_px + 4, _py + 4, text, 0.5, 0.5, 1);
+                    var _gx = _x;
+                    var _gy = _y;
+                    var _x_pos = _gx * cell_size + cell_size / 2;
+                    var _y_pos = _gy * cell_size + cell_size / 2;
+                    draw_text_transformed(_x_pos - cell_size / 2, _y_pos - cell_size / 2, string(_gx) + "," + string(_gy), .6, .6, 1);
                 }
             }
         },
@@ -240,23 +287,25 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         draw_closed_set : function (color = c_blue)
         {
             if (closed_set == undefined) return;
+            if (array_length(closed_set) == 0) return;
 
             draw_set_color(color);
             var _opacity = 0.33;
             draw_set_alpha(_opacity);
 
-            for (var _x = 0; _x < grid_width; _x++)
+            for (var i = 0; i < array_length(closed_set); i++)
             {
-                for (var _y = 0; _y < grid_height; _y++)
+                if (closed_set[i])
                 {
-                    if (closed_set[# _x, _y])
-                    {
-                        var _px = _x * cell_size;
-                        var _py = _y * cell_size;
-                        draw_rectangle(_px, _py, _px + cell_size, _py + cell_size, false);
-                    }
+                    var _gx = i mod grid_width;
+                    var _gy = i div grid_width;
+                    var _x  = _gx * cell_size;
+                    var _y  = _gy * cell_size;
+
+                    draw_rectangle(_x, _y, _x + cell_size, _y + cell_size, false);
                 }
             }
+            
             draw_set_alpha(1);
         }
     }
@@ -272,154 +321,200 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
 /// @returns {id}   Returns a ds_list containing the path from the target to the instance.
 function _path_builder(_struct)
 {
-    var path = ds_list_create();
-    var current_gx = _struct.target.x div _struct.cell_size;
-    var current_gy = _struct.target.y div _struct.cell_size;
+    _struct.timers.t6 = get_timer();
 
-    while(_struct.parent[# current_gx, current_gy] != undefined)
+    var _path        = ds_list_create();
+    var _grid_width  = _struct.grid_width;
+    var _current_gx  = _struct.goal_gx;
+    var _current_gy  = _struct.goal_gy;
+
+    var current_index = _current_gx + (_current_gy * _grid_width);
+    var parent_array   = _struct.parent;
+
+    while (parent_array[current_index] != undefined)
     {
-        ds_list_add(path, { gx: current_gx, gy: current_gy });
-        var parent_index = _struct.parent[# current_gx, current_gy];
-        current_gx = parent_index mod _struct.grid_width;
-        current_gy = parent_index div _struct.grid_width;
+        var node = { gx: _current_gx, gy: _current_gy };
+        ds_list_add(_path, node);
+
+        current_index = parent_array[current_index];
+        _current_gx   = current_index mod _grid_width;
+        _current_gy   = current_index div _grid_width;
     }
-    return path;
+    
+    _struct.path        = _path;
+    _struct.timers.t7   = get_timer();
 }
 
 /// @desc           Executes the A* algorithm step by step, updating the open and closed sets.
 /// @param {any*}   _struct The structure containing data for the A* algorithm.
 function _step_by_step_runner(_struct)
 {
-    if (ds_priority_empty(_struct.open_set)) return;
+    var _instance       = _struct.instance;
+    var _heuristic      = _struct.heuristic;
 
-    var current = ds_priority_delete_min(_struct.open_set);
-    var current_gx = current mod _struct.grid_width;
-    var current_gy = current div _struct.grid_width;
+    var _actual_gx = _instance.x div _struct.cell_size;
+    var _actual_gy = _instance.y div _struct.cell_size;
 
-    debug_message("Current node: (" + string(current_gx) + ", " + string(current_gy) + ")");
+    var _dx_array       = _heuristic == manhattan ? DIR_X_MANHATTAN : DIR_X_ALL;
+    var _dy_array       = _heuristic == manhattan ? DIR_Y_MANHATTAN : DIR_Y_ALL;
+    var _dir_count      = array_length(_dx_array);
 
-    _struct.node = { gx: current_gx, gy: current_gy };
-    _struct.closed_set[# current_gx, current_gy] = true;
+    var _grid_width      = _struct.grid_width;
+    var _grid_height     = _struct.grid_height;
 
-    debug_message($"Closed set updated: Node (" + string(current_gx) + ", " + string(current_gy) + ") added to closed set.");
+    var _goal_gx        = _struct.goal_gx;
+    var _goal_gy        = _struct.goal_gy;
 
-    var goal_gx = _struct.target.x div _struct.cell_size;
-    var goal_gy = _struct.target.y div _struct.cell_size;
+    var _grid           = _struct.grid;
+    var _closed_set     = _struct.closed_set;
+    var _open_set       = _struct.open_set;
+    var _parent         = _struct.parent;
+    var _g_cost         = _struct.g_cost;
+    
+    var _reached        = _struct.reached;
+    var _failure        = _struct.failure;
+    var _reached_nodes  = 0;
 
-    if (current_gx == goal_gx && current_gy == goal_gy)
+    if(!ds_priority_empty(_open_set))
     {
-        _struct.reached = true;
-        _struct.path = _path_builder(_struct);
-        debug_message("\nA* Success: Path found to target at (" + string(goal_gx) + ", " + string(goal_gy) + ")\n");
-        return;
+        var _current = ds_priority_delete_min(_open_set);
+        var _current_gx = _current mod _grid_width;
+        var _current_gy = _current div _grid_width;
+
+        _closed_set[_current] = true;
+        _reached_nodes++;
+
+        if (_current_gx == _goal_gx && _current_gy == _goal_gy)
+        {
+            _struct.reached = true;
+            _struct.operations = _reached_nodes;
+            _path_builder(_struct);
+            return;
+        }
+
+        var _current_g = _g_cost[_current];
+
+        for (var i = 0; i < _dir_count; i++)
+        {
+            var _n_gx = _current_gx  + _dx_array[i];
+            var _n_gy = _current_gy + _dy_array[i];
+
+            if (_n_gx < 0 || _n_gx >= _grid_width || _n_gy < 0 || _n_gy >= _grid_height) continue;
+
+            var _neighbor_id    = _n_gx + (_n_gy * _grid_width);
+
+            if (_struct.closed_set[_neighbor_id]) continue;
+            if (_struct.grid[_neighbor_id] != 0) continue;
+
+            var _movement_cost  = i > 4 ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
+            var new_g           = _current_g + _movement_cost;
+
+            if (new_g < _g_cost[_neighbor_id])
+            {
+                _g_cost[_neighbor_id] = new_g;
+                _parent[_neighbor_id] = _current;
+
+                var hn          = _heuristic(_n_gx, _n_gy, _goal_gx, _goal_gy);
+                var f_cost      = new_g + hn;
+
+                ds_priority_add(_open_set, _neighbor_id, f_cost);
+            }
+        }
     }
 
-    _add_open_set(_struct, current_gx, current_gy);
+    if (ds_priority_empty(_open_set) && !_struct.reached && !_struct.failure)
+    {
+        _struct.failure = true;
+        _struct.operations = _reached_nodes;
+        return;
+    }
 }
 
 /// @desc           Executes the A* algorithm until completion, updating the open and closed sets.
 /// @param {any*}   _struct The structure containing data for the A* algorithm.
 function a_star_runner(_struct)
 {
-    var goal_gx = _struct.target.x div _struct.cell_size;
-    var goal_gy = _struct.target.y div _struct.cell_size;
+    _struct.timers.t4   = get_timer();
+    var _instance       = _struct.instance;
+    var _heuristic      = _struct.heuristic;
 
-    while (!ds_priority_empty(_struct.open_set))
+    var _actual_gx = _instance.x div _struct.cell_size;
+    var _actual_gy = _instance.y div _struct.cell_size;
+
+    var _dx_array       = _heuristic == manhattan ? DIR_X_MANHATTAN : DIR_X_ALL;
+    var _dy_array       = _heuristic == manhattan ? DIR_Y_MANHATTAN : DIR_Y_ALL;
+    var _dir_count      = array_length(_dx_array);
+
+    var _grid_width      = _struct.grid_width;
+    var _grid_height     = _struct.grid_height;
+
+    var _goal_gx        = _struct.goal_gx;
+    var _goal_gy        = _struct.goal_gy;
+
+    var _grid           = _struct.grid;
+    var _closed_set     = _struct.closed_set;
+    var _open_set       = _struct.open_set;
+    var _parent         = _struct.parent;
+    var _g_cost         = _struct.g_cost;
+    
+    var _reached        = _struct.reached;
+    var _failure        = _struct.failure;
+    var _reached_nodes  = 0;
+
+    while(!ds_priority_empty(_open_set))
     {
-        var current = ds_priority_delete_min(_struct.open_set);
-        var current_gx = current mod _struct.grid_width;
-        var current_gy = current div _struct.grid_width;
+        var _current = ds_priority_delete_min(_open_set);
+        var _current_gx = _current mod _grid_width;
+        var _current_gy = _current div _grid_width;
 
-        _struct.node = { gx: current_gx, gy: current_gy };
-        _struct.closed_set[# current_gx, current_gy] = true;
+        _closed_set[_current] = true;
+        _reached_nodes++;
 
-        if (current_gx == goal_gx && current_gy == goal_gy)
+        if (_current_gx == _goal_gx && _current_gy == _goal_gy)
         {
             _struct.reached = true;
-            _struct.path = _path_builder(_struct);
-            debug_message("\nA* Success: Path found to target at (" + string(goal_gx) + ", " + string(goal_gy) + ")\n");
+            timers.t5       = get_timer();
+            _struct.operations = _reached_nodes;
+            _path_builder(_struct);
             return;
         }
 
-        _add_open_set(_struct, current_gx, current_gy);
+        var _current_g = _g_cost[_current];
+
+        for (var i = 0; i < _dir_count; i++)
+        {
+            var _n_gx = _current_gx  + _dx_array[i];
+            var _n_gy = _current_gy + _dy_array[i];
+
+            if (_n_gx < 0 || _n_gx >= _grid_width || _n_gy < 0 || _n_gy >= _grid_height) continue;
+
+            var _neighbor_id    = _n_gx + (_n_gy * _grid_width);
+
+            if (_struct.closed_set[_neighbor_id]) continue;
+            if (_struct.grid[_neighbor_id] != 0) continue;
+
+            var _movement_cost  = i > 4 ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
+            var new_g           = _current_g + _movement_cost;
+
+            if (new_g < _g_cost[_neighbor_id])
+            {
+                _g_cost[_neighbor_id] = new_g;
+                _parent[_neighbor_id] = _current;
+
+                var hn          = _heuristic(_n_gx, _n_gy, _goal_gx, _goal_gy);
+                var f_cost      = new_g + hn;
+
+                ds_priority_add(_open_set, _neighbor_id, f_cost);
+            }
+        }
     }
 
-    if (ds_priority_empty(_struct.open_set) && !_struct.reached && !_struct.failure)
+    if (ds_priority_empty(_open_set) && !_struct.reached && !_struct.failure)
     {
         _struct.failure = true;
-        debug_message("\nA* Failure: No path found to target at (" + string(goal_gx) + ", " + string(goal_gy) + ")\n");
-    }
-}
-
-/// @desc           Adds neighboring nodes to the open set for the A* algorithm.
-/// @param {any*}   _struct The structure containing data for the A* algorithm.
-/// @param {Real} [_gx]=-1 The x-coordinate of the current node.
-/// @param {Real} [_gy]=-1 The y-coordinate of the current node.
-function _add_open_set (_struct, _gx = -1, _gy = -1)
-{
-    var _directions;
-    var _movement_cost;
-    var _actual_gx = real(_gx);
-    var _actual_gy = real(_gy);
-
-    if (_gx == -1 || _gy == -1)
-    {
-        var actual_location = _actual_location(_struct);
-        _actual_gx = real(actual_location.gx);
-        _actual_gy = real(actual_location.gy);
-    }
-
-    if (_struct.heuristic == manhattan)
-    {
-        _directions     = [
-            { dx: -1, dy: 0 }, // left
-            { dx: 1, dy: 0 },  // right
-            { dx: 0, dy: -1 }, // up
-            { dx: 0, dy: 1 }   // down
-        ];
-    }
-    else
-    {
-        _directions     = [
-            { dx: -1, dy: 0 }, // left
-            { dx: 1, dy: 0 },  // right
-            { dx: 0, dy: -1 }, // up
-            { dx: 0, dy: 1 },  // down
-            { dx: -1, dy: -1 }, // up-left
-            { dx: 1, dy: -1 },  // up-right
-            { dx: -1, dy: 1 },  // down-left
-            { dx: 1, dy: 1 }    // down-right
-        ];
-    }
-
-    for (var i = 0; i < array_length(_directions); i++)
-    {
-        var _dir = _directions[i];
-        var _n_gx = _actual_gx + _dir.dx;
-        var _n_gy = _actual_gy + _dir.dy;
-
-        if (!_is_room_cell(_n_gx, _n_gy, _struct.grid)) 
-            continue;
-        if (_struct.closed_set[# _n_gx, _n_gy]) 
-            continue;
-        if (!_free_path(_struct, _n_gx, _n_gy))
-            continue;
-               
-        _movement_cost = (abs(_dir.dx) + abs(_dir.dy) == 2) ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
-
-        var hn          = _struct.heuristic(_n_gx, _n_gy, _struct.target.x div _struct.cell_size, _struct.target.y div _struct.cell_size);
-        var current_g   = _struct.g_cost[# _actual_gx, _actual_gy];
-        var new_g       = current_g + _movement_cost;
-
-        if (new_g < _struct.g_cost[# _n_gx, _n_gy])
-        {
-            _struct.g_cost[# _n_gx, _n_gy] = new_g;
-            _struct.parent[# _n_gx, _n_gy] = _actual_gx + (_actual_gy * _struct.grid_width);
-
-            var f_cost = new_g + hn;
-
-            ds_priority_add(_struct.open_set, _n_gx + (_n_gy * _struct.grid_width), f_cost);
-        }
+        timers.t5       = get_timer();
+        _struct.operations = _reached_nodes;
+        return;
     }
 }
 
@@ -427,24 +522,10 @@ function _add_open_set (_struct, _gx = -1, _gy = -1)
 
 #region Helper Functions
 
-/// @desc           Displays a debug message if active_debug is true.
-/// @param {String} _message The message to display in the debug console.
-function debug_message(_message)
-{
-    if (active_debug)
-    {
-        show_debug_message(_message);
-    }
-}
-
 /// @desc               Clears the A* algorithm's data structures and resets the state.
 /// @param {any*}       _struct The structure containing data for the A* algorithm.
 function clear(_struct)
 {
-    ds_grid_destroy(_struct.grid);
-    ds_grid_destroy(_struct.closed_set);
-    ds_grid_destroy(_struct.g_cost);
-    ds_grid_destroy(_struct.parent);
     ds_priority_destroy(_struct.open_set);
 
     _struct.grid        = undefined;
@@ -467,95 +548,52 @@ function clear(_struct)
 /// @param {Real} cell_size         The size of each cell in the grid.
 function _grid_filler(_struct)
 {
-    if (array_length(_struct.obstacles) > 0)
+    _struct.timers.t2           = get_timer();
+    var _obstacles_count    = array_length(_struct.obstacles);
+    var _cell_size          = _struct.cell_size;
+    var _grid               = _struct.grid;
+    var _grid_width         = _struct.grid_width;
+    var _grid_height        = _struct.grid_height;
+
+    if (_obstacles_count <= 0) return;
+    
+    for (var i = 0; i < _obstacles_count; i++)
     {
-        for (var i = 0; i < array_length(_struct.obstacles); i++)
-        {
-            var _obs = _struct.obstacles[i];
-            if (instance_exists(_obs))
+        var instance = _struct.obstacles[i];
+
+        if (instance == noone) continue;        
+        with (instance)
+        {   
+            // Check if the sprite size matches the cell size
+            if (sprite_width == _cell_size && sprite_height == _cell_size)
             {
-                _object_grid_location(_obs, _struct.cell_size, _struct.grid);
+                var _gx     = x div _cell_size;
+                var _gy     = y div _cell_size;
+                var _index  = _gx + (_gy * _grid_width);
+
+                _grid[_index]    = object_index;
             }
             else
-            {
-                debug_message("A* Error: Obstacle instance does not exist.");
-                return;
-            }
-        }
-    }
-}
+            {   
+                // If the sprite size is larger than the cell size, mark all cells covered by the sprite as obstacles
+                var _width  = sprite_width div _cell_size;
+                var _height = sprite_height div _cell_size;
 
-/// @desc                               Sets the grid coordinates of the given instance.
-/// @param {Instance} instance          The instance to set the grid coordinates for.
-/// @param {Real} cell_size             The size of each cell in the grid.
-/// @param {id.dsgrid<any*>} grid       The grid to store the instance's location in.
-function _object_grid_location(instance, cell_size, grid)
-{
-    with (instance)
-    {   
-        // Check if the sprite size matches the cell size
-        if (sprite_width == other.cell_size && sprite_height == other.cell_size)
-        {
-            var _gx     = x div other.cell_size;
-            var _gy     = y div other.cell_size;
-
-            other.grid[# _gx, _gy]    = object_index;
-        }
-        else
-        {   
-            // If the sprite size is larger than the cell size, mark all cells covered by the sprite as obstacles
-            var _width  = sprite_width div other.cell_size;
-            var _height = sprite_height div other.cell_size;
-
-            for (var _x = 0; _x < _width; _x++)
-            {
-                for (var _y = 0; _y < _height; _y++)
+                for (var _x = 0; _x < _width; _x++)
                 {
-                    var _gx, _gy;
-                    _gx         = (x + (_x * other.cell_size)) div other.cell_size;
-                    _gy         = (y + (_y * other.cell_size)) div other.cell_size;
+                    for (var _y = 0; _y < _height; _y++)
+                    {
+                        var _gx     = (x + (_x * _cell_size)) div _cell_size;
+                        var _gy     = (y + (_y * _cell_size)) div _cell_size;
+                        var _index  = _gx + (_gy * _grid_width);
 
-                    other.grid[# _gx, _gy]    = object_index; 
+                        _grid[_index]    = object_index;
+                    }
                 }
             }
         }
     }
-}
-
-/// @desc                       Checks if the given cell coordinates are valid (not an obstacle) in the grid.
-/// @param {Real}               _x X coordinate of the cell to check.
-/// @param {Real}               _y Y coordinate of the cell to check.
-/// @param {id.dsgrid<any*>}    grid The grid to check the cell in.
-/// @returns {bool}             Returns true if the cell is valid (not an obstacle), false otherwise.
-function _free_path(_struct, _gx, _gy)
-{
-    gml_pragma("forceinline");    
-    return _struct.grid[# _gx, _gy] == 0;
-}
-
-/// @desc                       Checks if the given coordinates are valid (not an obstacle) in the grid.
-/// @param {Real}               _x X coordinate of the cell to check.
-/// @param {Real}               _y Y coordinate of the cell to check.
-/// @param {id.dsgrid<any*>}    grid The grid to check the cell in.
-/// @returns {bool}             Returns true if the cell is valid (not an obstacle), false otherwise.
-function _is_valid_cell(_x, _y, _grid)
-{
-    gml_pragma("forceinline");
-    var _gx     = _x div cell_size;
-    var _gy = _y div cell_size;
-
-    return _grid[# _gx, _gy] == 0;
-}
-
-/// @desc                   Checks if the given cell coordinates are within the bounds of the grid.
-/// @param {Real}           _row Row coordinate of the cell to check.
-/// @param {Real} _col      _col Column coordinate of the cell to check.
-/// @param {id.dsgrid}      _grid The grid to check the cell in.
-/// @returns {bool}         Returns true if the cell is within the bounds of the grid, false otherwise.
-function _is_room_cell(_row, _col, _grid)
-{
-    gml_pragma("forceinline");
-    return _row >= 0 && _row < ds_grid_width(_grid) && _col >= 0 && _col < ds_grid_height(_grid);
+    _struct.timers.t3           = get_timer();
 }
 
 /// @desc                   Returns the actual grid coordinates of the given instance based on its position and cell size.
@@ -566,8 +604,6 @@ function _actual_location(_struct)
     gml_pragma("forceinline");
     var _gx     = _struct.instance.x div _struct.cell_size;
     var _gy     = _struct.instance.y div _struct.cell_size;
-
-    debug_message("Actual location of instance: (" + string(_gx) + ", " + string(_gy) + ")");
 
     return {
         gx: string(_gx),
@@ -588,7 +624,6 @@ function _actual_location(_struct)
 function manhattan (x1, y1, x2, y2) // used when able to move in 4 directions
 {
     gml_pragma("forceinline");
-    debug_message("Manhattan heuristic: (" + string(x1) + ", " + string(y1) + ") to (" + string(x2) + ", " + string(y2) + ")");
     return abs(x2 - x1) + abs(y2 - y1);
 }
 
@@ -602,7 +637,6 @@ function manhattan (x1, y1, x2, y2) // used when able to move in 4 directions
 function euclidean (x1, y1, x2, y2) // used when able to move in 8 directions and has no obstacles
 {
     gml_pragma("forceinline");
-    debug_message("Euclidean heuristic: (" + string(x1) + ", " + string(y1) + ") to (" + string(x2) + ", " + string(y2) + ")");
     return sqrt(sqr(x2 - x1) + sqr(y2 - y1));
 }
 
@@ -615,7 +649,6 @@ function euclidean (x1, y1, x2, y2) // used when able to move in 8 directions an
 function simple_euclidian (x1, y1, x2, y2) // used when able to move in 8 directions and has no obstacles
 {
     gml_pragma("forceinline");
-    debug_message("Simple Euclidean heuristic: (" + string(x1) + ", " + string(y1) + ") to (" + string(x2) + ", " + string(y2) + ")");
     return point_distance(x1, y1, x2, y2);
 }
 
@@ -630,7 +663,6 @@ function octile (x1, y1, x2, y2) // used when able to move in 8 directions
     gml_pragma("forceinline");
     var dx = abs(x2 - x1);
     var dy = abs(y2 - y1);
-    debug_message("Octile heuristic: (" + string(x1) + ", " + string(y1) + ") to (" + string(x2) + ", " + string(y2) + ")");
     return (dx + dy) + (sqrt(2) - 2) * min(dx, dy);
 }
 
@@ -645,7 +677,6 @@ function chebyshev (x1, y1, x2, y2) // used when able to move in 8 directions
     gml_pragma("forceinline");
     var dx = abs(x2 - x1);
     var dy = abs(y2 - y1);
-    debug_message("Chebyshev heuristic: (" + string(x1) + ", " + string(y1) + ") to (" + string(x2) + ", " + string(y2) + ")");
     return max(dx, dy);
 }
 
