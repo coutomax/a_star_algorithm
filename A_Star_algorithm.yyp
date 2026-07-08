@@ -28,8 +28,9 @@
     {"id":{"name":"obj_enemy","path":"objects/obj_enemy/obj_enemy.yy",},},
     {"id":{"name":"obj_target","path":"objects/obj_target/obj_target.yy",},},
     {"id":{"name":"obj_wall","path":"objects/obj_wall/obj_wall.yy",},},
+    {"id":{"name":"rm_best_case","path":"rooms/rm_best_case/rm_best_case.yy",},},
+    {"id":{"name":"rm_worst_case","path":"rooms/rm_worst_case/rm_worst_case.yy",},},
     {"id":{"name":"Room1","path":"rooms/Room1/Room1.yy",},},
-    {"id":{"name":"TESTE","path":"rooms/TESTE/TESTE.yy",},},
     {"id":{"name":"scr_A_star","path":"scripts/scr_A_star/scr_A_star.yy",},},
     {"id":{"name":"spr_obstacle","path":"sprites/spr_obstacle/spr_obstacle.yy",},},
     {"id":{"name":"spr_target","path":"sprites/spr_target/spr_target.yy",},},
@@ -38,8 +39,9 @@
   "resourceType":"GMProject",
   "resourceVersion":"2.0",
   "RoomOrderNodes":[
+    {"roomId":{"name":"rm_best_case","path":"rooms/rm_best_case/rm_best_case.yy",},},
     {"roomId":{"name":"Room1","path":"rooms/Room1/Room1.yy",},},
-    {"roomId":{"name":"TESTE","path":"rooms/TESTE/TESTE.yy",},},
+    {"roomId":{"name":"rm_worst_case","path":"rooms/rm_worst_case/rm_worst_case.yy",},},
   ],
   "templateType":"game",
   "TextureGroups":[

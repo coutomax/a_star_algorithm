@@ -104,10 +104,9 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             parent      = array_create(_total_cells, undefined);
             g_cost      = array_create(_total_cells, INF);
 
-            var actual_location = _actual_location(self);
-            var _start_gx       = real(actual_location.gx);
-            var _start_gy       = real(actual_location.gy);
-            var _start_index    = _start_gx + (_start_gy * grid_width);
+            var _gx     = instance.x div cell_size;
+            var _gy     = instance.y div cell_size;
+            var _start_index    = _gx + (_gy * grid_width);
 
             ds_priority_add(open_set, _start_index, 0);
 
@@ -126,9 +125,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             if (!init()) return;
 
             timers.t1   = get_timer();
-            
-            var actual_location = _actual_location(self);
-
+        
             _grid_filler(self);
         },
 
@@ -156,6 +153,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         {
             if (instance == noone || target == noone) return;
             if (path == undefined || ds_list_size(path) == 0) return;
+            if (!reached) return;
 
             var next_node = path[| ds_list_size(path) - 1];
             var next_x = next_node.gx * cell_size + cell_size / 2;
@@ -230,6 +228,8 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
 
             var _gx     = node.gx;
             var _gy     = node.gy;
+            var _last_gx   = node.last.gx;
+            var _last_gy   = node.last.gy;
             var _x      = _gx * cell_size;
             var _y      = _gy * cell_size;
 
@@ -238,6 +238,8 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             
             draw_set_alpha(opacity);
             draw_rectangle(_x, _y, _x + cell_size, _y + cell_size, false);
+            draw_set_color(c_aqua);
+            draw_rectangle(_last_gx * cell_size, _last_gy * cell_size, _last_gx * cell_size + cell_size, _last_gy * cell_size + cell_size, false);
             draw_set_alpha(1);
         },
 
@@ -328,39 +330,39 @@ function _path_builder(_struct)
     var _current_gx  = _struct.goal_gx;
     var _current_gy  = _struct.goal_gy;
 
-    var current_index = _current_gx + (_current_gy * _grid_width);
-    var parent_array   = _struct.parent;
+    var _current_index = _current_gx + (_current_gy * _grid_width);
+    var _parent_array   = _struct.parent;
 
-    while (parent_array[current_index] != undefined)
+    while (_parent_array[_current_index] != undefined)
     {
         var node = { gx: _current_gx, gy: _current_gy };
         ds_list_add(_path, node);
 
-        current_index = parent_array[current_index];
-        _current_gx   = current_index mod _grid_width;
-        _current_gy   = current_index div _grid_width;
+        _current_index = _parent_array[_current_index];
+        _current_gx   = _current_index mod _grid_width;
+        _current_gy   = _current_index div _grid_width;
     }
     
     _struct.path        = _path;
     _struct.timers.t7   = get_timer();
 }
 
-/// @desc           Executes the A* algorithm step by step, updating the open and closed sets.
+/// @desc           Executes the A* algorithm step by step, for better visualization and debugging. Updates the open and closed sets.
 /// @param {any*}   _struct The structure containing data for the A* algorithm.
 function _step_by_step_runner(_struct)
 {
     var _instance       = _struct.instance;
     var _heuristic      = _struct.heuristic;
 
-    var _actual_gx = _instance.x div _struct.cell_size;
-    var _actual_gy = _instance.y div _struct.cell_size;
+    var _actual_gx      = _instance.x div _struct.cell_size;
+    var _actual_gy      = _instance.y div _struct.cell_size;
 
-    var _dx_array       = _heuristic == manhattan ? DIR_X_MANHATTAN : DIR_X_ALL;
-    var _dy_array       = _heuristic == manhattan ? DIR_Y_MANHATTAN : DIR_Y_ALL;
+    var _dx_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_X_MANHATTAN : DIR_X_ALL;
+    var _dy_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_Y_MANHATTAN : DIR_Y_ALL;
     var _dir_count      = array_length(_dx_array);
 
-    var _grid_width      = _struct.grid_width;
-    var _grid_height     = _struct.grid_height;
+    var _grid_width     = _struct.grid_width;
+    var _grid_height    = _struct.grid_height;
 
     var _goal_gx        = _struct.goal_gx;
     var _goal_gy        = _struct.goal_gy;
@@ -371,13 +373,13 @@ function _step_by_step_runner(_struct)
     var _parent         = _struct.parent;
     var _g_cost         = _struct.g_cost;
     
-    var _reached        = _struct.reached;
-    var _failure        = _struct.failure;
     var _reached_nodes  = 0;
+
+    var _parent_node      = _struct.node;
 
     if(!ds_priority_empty(_open_set))
     {
-        var _current = ds_priority_delete_min(_open_set);
+        var _current    = ds_priority_delete_min(_open_set);
         var _current_gx = _current mod _grid_width;
         var _current_gy = _current div _grid_width;
 
@@ -386,28 +388,40 @@ function _step_by_step_runner(_struct)
 
         if (_current_gx == _goal_gx && _current_gy == _goal_gy)
         {
-            _struct.reached = true;
-            _struct.operations = _reached_nodes;
+            _struct.reached     = true;
+            _struct.operations  = _reached_nodes;
+            _struct.node        = undefined;
             _path_builder(_struct);
             return;
         }
 
-        var _current_g = _g_cost[_current];
+        var _current_g      = _g_cost[_current];
 
         for (var i = 0; i < _dir_count; i++)
         {
-            var _n_gx = _current_gx  + _dx_array[i];
-            var _n_gy = _current_gy + _dy_array[i];
+            var _n_gx   = _current_gx + _dx_array[i];
+            var _n_gy   = _current_gy + _dy_array[i];
 
             if (_n_gx < 0 || _n_gx >= _grid_width || _n_gy < 0 || _n_gy >= _grid_height) continue;
 
             var _neighbor_id    = _n_gx + (_n_gy * _grid_width);
 
-            if (_struct.closed_set[_neighbor_id]) continue;
-            if (_struct.grid[_neighbor_id] != 0) continue;
+            if (_closed_set[_neighbor_id]) continue;
+            if (_grid[_neighbor_id] != 0) continue;
 
-            var _movement_cost  = i > 4 ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
+            if (i >= 4)
+            {
+                var _adj_id1 = _n_gx + (_current_gy * _grid_width);
+                var _adj_id2 = _current_gx + (_n_gy * _grid_width);
+
+                if (_grid[_adj_id1] != 0 && _grid[_adj_id2] != 0) continue;
+            }
+
+            var _movement_cost  = i >= 4 ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
             var new_g           = _current_g + _movement_cost;
+        
+            _struct.node    = { gx: _n_gx, gy: _n_gy, last: _parent_node };
+            _parent_node    = {gx: _current_gx, gy: _current_gy};
 
             if (new_g < _g_cost[_neighbor_id])
             {
@@ -424,8 +438,9 @@ function _step_by_step_runner(_struct)
 
     if (ds_priority_empty(_open_set) && !_struct.reached && !_struct.failure)
     {
-        _struct.failure = true;
-        _struct.operations = _reached_nodes;
+        _struct.failure     = true;
+        _struct.operations  = _reached_nodes;
+        _struct.node        = undefined;
         return;
     }
 }
@@ -435,18 +450,19 @@ function _step_by_step_runner(_struct)
 function a_star_runner(_struct)
 {
     _struct.timers.t4   = get_timer();
+
     var _instance       = _struct.instance;
     var _heuristic      = _struct.heuristic;
 
-    var _actual_gx = _instance.x div _struct.cell_size;
-    var _actual_gy = _instance.y div _struct.cell_size;
+    var _actual_gx      = _instance.x div _struct.cell_size;
+    var _actual_gy      = _instance.y div _struct.cell_size;
 
-    var _dx_array       = _heuristic == manhattan ? DIR_X_MANHATTAN : DIR_X_ALL;
-    var _dy_array       = _heuristic == manhattan ? DIR_Y_MANHATTAN : DIR_Y_ALL;
+    var _dx_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_X_MANHATTAN : DIR_X_ALL;
+    var _dy_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_Y_MANHATTAN : DIR_Y_ALL;
     var _dir_count      = array_length(_dx_array);
 
-    var _grid_width      = _struct.grid_width;
-    var _grid_height     = _struct.grid_height;
+    var _grid_width     = _struct.grid_width;
+    var _grid_height    = _struct.grid_height;
 
     var _goal_gx        = _struct.goal_gx;
     var _goal_gy        = _struct.goal_gy;
@@ -456,50 +472,52 @@ function a_star_runner(_struct)
     var _open_set       = _struct.open_set;
     var _parent         = _struct.parent;
     var _g_cost         = _struct.g_cost;
-    
-    var _reached        = _struct.reached;
-    var _failure        = _struct.failure;
-    var _reached_nodes  = 0;
 
     while(!ds_priority_empty(_open_set))
     {
-        var _current = ds_priority_delete_min(_open_set);
+        var _current    = ds_priority_delete_min(_open_set);
         var _current_gx = _current mod _grid_width;
         var _current_gy = _current div _grid_width;
 
         _closed_set[_current] = true;
-        _reached_nodes++;
 
         if (_current_gx == _goal_gx && _current_gy == _goal_gy)
         {
             _struct.reached = true;
             timers.t5       = get_timer();
-            _struct.operations = _reached_nodes;
             _path_builder(_struct);
             return;
         }
 
-        var _current_g = _g_cost[_current];
+        var _current_g      = _g_cost[_current];
 
         for (var i = 0; i < _dir_count; i++)
         {
-            var _n_gx = _current_gx  + _dx_array[i];
-            var _n_gy = _current_gy + _dy_array[i];
+            var _n_gx       = _current_gx + _dx_array[i];
+            var _n_gy       = _current_gy + _dy_array[i];
 
             if (_n_gx < 0 || _n_gx >= _grid_width || _n_gy < 0 || _n_gy >= _grid_height) continue;
 
             var _neighbor_id    = _n_gx + (_n_gy * _grid_width);
 
-            if (_struct.closed_set[_neighbor_id]) continue;
-            if (_struct.grid[_neighbor_id] != 0) continue;
+            if (_closed_set[_neighbor_id]) continue;
+            if (_grid[_neighbor_id] != 0) continue;
 
-            var _movement_cost  = i > 4 ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
+            if (i >= 4)
+            {
+                var _adj_id1 = _n_gx + (_current_gy * _grid_width);
+                var _adj_id2 = _current_gx + (_n_gy * _grid_width);
+
+                if (_grid[_adj_id1] != 0 && _grid[_adj_id2] != 0) continue;
+            }
+
+            var _movement_cost  = i >= 4 ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
             var new_g           = _current_g + _movement_cost;
 
             if (new_g < _g_cost[_neighbor_id])
             {
-                _g_cost[_neighbor_id] = new_g;
-                _parent[_neighbor_id] = _current;
+                _g_cost[_neighbor_id]   = new_g;
+                _parent[_neighbor_id]   = _current;
 
                 var hn          = _heuristic(_n_gx, _n_gy, _goal_gx, _goal_gy);
                 var f_cost      = new_g + hn;
@@ -513,7 +531,6 @@ function a_star_runner(_struct)
     {
         _struct.failure = true;
         timers.t5       = get_timer();
-        _struct.operations = _reached_nodes;
         return;
     }
 }
@@ -596,21 +613,6 @@ function _grid_filler(_struct)
     _struct.timers.t3           = get_timer();
 }
 
-/// @desc                   Returns the actual grid coordinates of the given instance based on its position and cell size.
-/// @param {any*}           _struct The structure containing data for the A* algorithm, including the instance and cell size.
-/// @returns {struct}        Returns a structure containing the grid coordinates of the instance.
-function _actual_location(_struct)
-{
-    gml_pragma("forceinline");
-    var _gx     = _struct.instance.x div _struct.cell_size;
-    var _gy     = _struct.instance.y div _struct.cell_size;
-
-    return {
-        gx: string(_gx),
-        gy: string(_gy)
-    };
-}
-
 #endregion
 
 #region Heuristic Functions
@@ -627,6 +629,18 @@ function manhattan (x1, y1, x2, y2) // used when able to move in 4 directions
     return abs(x2 - x1) + abs(y2 - y1);
 }
 
+/// @desc               Returns the heuristic based on Manhattan distance method, but with a slight bias to prefer straight paths.
+/// @param {Real} x1    X of starting position.
+/// @param {Real} y1    Y of starting position.
+/// @param {Real} x2    X of target position.
+/// @param {Real} y2    Y of target position.
+/// @returns {Real}     Returns the value that references the cost to reach the goal.
+function manhattan_tie_breaker (x1, y1, x2, y2) // used when able to move in 4 directions
+{
+    gml_pragma("forceinline");
+    var _dist = abs(x2 - x1) + abs(y2 - y1);
+    return _dist * 1.001;
+}
 
 /// @desc               Returns the heuristic based on Euclidean distance method.
 /// @param {Real} x1    X of starting position.
@@ -634,22 +648,10 @@ function manhattan (x1, y1, x2, y2) // used when able to move in 4 directions
 /// @param {Real} x2    X of target position.
 /// @param {Real} y2    Y of target position.
 /// @returns {Real}     Returns the value that references the cost to reach the goal.
-function euclidean (x1, y1, x2, y2) // used when able to move in 8 directions and has no obstacles
+function euclidean (x1, y1, x2, y2) // used when able to move in 8 directions
 {
     gml_pragma("forceinline");
     return sqrt(sqr(x2 - x1) + sqr(y2 - y1));
-}
-
-/// @desc               Returns the heuristic based on point_distance inbuilt method.
-/// @param {Real} x1    X of starting position.
-/// @param {Real} y1    Y of starting position.
-/// @param {Real} x2    X of target position.
-/// @param {Real} y2    Y of target position.
-/// @returns {Real}     Returns the value that references the cost to reach the goal.
-function simple_euclidian (x1, y1, x2, y2) // used when able to move in 8 directions and has no obstacles
-{
-    gml_pragma("forceinline");
-    return point_distance(x1, y1, x2, y2);
 }
 
 /// @desc               Returns the heuristic based on Octile distance method.
@@ -660,10 +662,10 @@ function simple_euclidian (x1, y1, x2, y2) // used when able to move in 8 direct
 /// @returns {Real}     Returns the value that references the cost to reach the goal.
 function octile (x1, y1, x2, y2) // used when able to move in 8 directions
 {
-    gml_pragma("forceinline");
-    var dx = abs(x2 - x1);
-    var dy = abs(y2 - y1);
-    return (dx + dy) + (sqrt(2) - 2) * min(dx, dy);
+    var _h_dx = abs(x2 - x1);
+    var _h_dy = abs(y2 - y1);
+    var _min_val = (_h_dx < _h_dy) ? _h_dx : _h_dy;
+    return ((_h_dx + _h_dy) + (-0.5857864) * _min_val) * 1.001;
 }
 
 /// @desc               Returns the heuristic based on Chebyshev distance method.
