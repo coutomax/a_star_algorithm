@@ -20,7 +20,17 @@ This version allows for customization and adjustments to meet the developer's ne
 -  `init()` You don't need to call this one; it simply initializes the structures that are used. 
 -  `on_create()` Forces the correct initialization of the structures, used on Create Event:
 -  `on_step()` Called on Step Event. Steps through the A* algorithm until the target is reached or no path is found.
--  ``
+-  `on_activate()` Called during any event, it is used to track the algorithm's progression step by step. It serves to visualize its operation.
+-  `move_instance()` It serves to moving the instance `seeker_object` after the completion of path building process.
+-  `print_timers()` Print the execution times, exclusively to measure the completion time.
+-  `clear()` Call this if you want to clear the vectors and other structures used.
+-  `draw_grid()` Called on Draw Event. Draws the grid.
+-  `draw_current_node()` Draws the current node in the grid.
+-  `draw_path()` Draws the path from the target to the instance in the grid after the path building process.
+-  `draw_coordinates()` Draws the coordinates of each cell in the grid.
+-  `draw_closed_set()` Draws the closed set in the grid.
+
+- The remaining non-callable functions are properly documented in the code using the JSDoc standard to facilitate understanding.
 
 # Quick usage:
 
