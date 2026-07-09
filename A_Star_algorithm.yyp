@@ -39,8 +39,8 @@
   "resourceType":"GMProject",
   "resourceVersion":"2.0",
   "RoomOrderNodes":[
-    {"roomId":{"name":"rm_best_case","path":"rooms/rm_best_case/rm_best_case.yy",},},
     {"roomId":{"name":"Room1","path":"rooms/Room1/Room1.yy",},},
+    {"roomId":{"name":"rm_best_case","path":"rooms/rm_best_case/rm_best_case.yy",},},
     {"roomId":{"name":"rm_worst_case","path":"rooms/rm_worst_case/rm_worst_case.yy",},},
   ],
   "templateType":"game",

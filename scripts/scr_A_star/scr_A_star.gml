@@ -1,4 +1,3 @@
-
 #macro DIR_X_ALL [-1, 1, 0, 0, -1, 1, -1, 1]
 #macro DIR_Y_ALL [0, 0, -1, 1, -1, -1, 1, 1]
 
@@ -31,7 +30,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         grid_width      : 0,
         grid_height     : 0,
         f_cost          : 0,
-        operations      : 0,
+        visited_nodes   : 0,
         goal_gx         : 0,
         goal_gy         : 0,
         reached         : false,
@@ -184,18 +183,21 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         print_timers : function ()
         {
             if (timers.printed) return;
+            if (visited_nodes == 0) return;
+            if (!reached && !failure) return;
 
             var _t_init = (timers.t1 - timers.t0) / 1000;
             var _t_create = (timers.t3 - timers.t2) / 1000;
             var _t_a_star = (timers.t5 - timers.t4) / 1000;
             var _t_path_build = (timers.t7 - timers.t6) / 1000;
+            var _visited_nodes_count = visited_nodes > 0  ? string(visited_nodes) : " DISABLED (Step-by-step mode)"; //enabled only in step-by-step mode to prioritize performance
 
-            show_debug_message("A* Timers:");
+            show_debug_message("\n\n\nA* Timers:");
             show_debug_message("Initialization Time: " + string(_t_init) + " ms");
             show_debug_message("Grid Filling Time: " + string(_t_create) + " ms");
             show_debug_message("A* Execution Time: " + string(_t_a_star) + " ms");
             show_debug_message("Path Building Time: " + string(_t_path_build) + " ms");
-            show_debug_message("Total Operations: " + string(operations));
+            show_debug_message("Total Visited Nodes: " + _visited_nodes_count + "\n\n\n");
 
             timers.printed = true;
         },
@@ -372,8 +374,6 @@ function _step_by_step_runner(_struct)
     var _open_set       = _struct.open_set;
     var _parent         = _struct.parent;
     var _g_cost         = _struct.g_cost;
-    
-    var _reached_nodes  = 0;
 
     var _parent_node      = _struct.node;
 
@@ -384,12 +384,10 @@ function _step_by_step_runner(_struct)
         var _current_gy = _current div _grid_width;
 
         _closed_set[_current] = true;
-        _reached_nodes++;
 
         if (_current_gx == _goal_gx && _current_gy == _goal_gy)
         {
             _struct.reached     = true;
-            _struct.operations  = _reached_nodes;
             _struct.node        = undefined;
             _path_builder(_struct);
             return;
@@ -419,7 +417,9 @@ function _step_by_step_runner(_struct)
 
             var _movement_cost  = i >= 4 ? 1.4 : 1; // Cost for diagonal movement (sqrt(2) * 1) or straight movement;
             var new_g           = _current_g + _movement_cost;
-        
+
+            _struct.visited_nodes++;
+
             _struct.node    = { gx: _n_gx, gy: _n_gy, last: _parent_node };
             _parent_node    = {gx: _current_gx, gy: _current_gy};
 
@@ -439,7 +439,6 @@ function _step_by_step_runner(_struct)
     if (ds_priority_empty(_open_set) && !_struct.reached && !_struct.failure)
     {
         _struct.failure     = true;
-        _struct.operations  = _reached_nodes;
         _struct.node        = undefined;
         return;
     }
@@ -555,7 +554,7 @@ function clear(_struct)
     _struct.f_cost      = 0;
     _struct.reached     = false;
     _struct.failure     = false;
-    _struct.operations  = 0;
+    _struct.visited_nodes  = 0;
 }
 
 /// @desc                           Fills the grid with the given instance, target, and obstacles.
