@@ -9,7 +9,7 @@ This version allows for customization and adjustments to meet the developer's ne
 
 # Features
 
-- Structure based on directly calling reference functions within the controller object's events.
+- Structure based on the struct call within the Create Event of the object seeking the path.
 - Groups functions for runtime visualization and debugging.
 - Allows for direct execution of the algorithm as desired.
 - Enables step-by-step execution of the algorithm to visualize its operation incrementally.
@@ -46,9 +46,9 @@ This version allows for customization and adjustments to meet the developer's ne
 - Example: (Create Event)
   
 ```gml
-move_speed  = 4;
+move_speed = 4;
 
-a       = a_star(obj_enemy, obj_target, 32, [obj_wall], manhattan_tie_breaker);
+a = a_star(self, obj_target, 32, [obj_wall], manhattan_tie_breaker);
 a.on_create();
 ```
 
