@@ -9,7 +9,7 @@ This version allows for customization and adjustments to meet the developer's ne
 
 # Features
 
-- Structure based on the struct call within the Create Event of the object seeking the path.
+- Structure based on the struct call within the Events of the object seeking the path.
 - Groups functions for runtime visualization and debugging.
 - Allows for direct execution of the algorithm as desired.
 - Enables step-by-step execution of the algorithm to visualize its operation incrementally.
