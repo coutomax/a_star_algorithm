@@ -103,7 +103,9 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             parent      = array_create(_total_cells, undefined);
             g_cost      = array_create(_total_cells, INF);
 
-            var _gx     = instance.x div cell_size;
+            show_debug_message("INSTANCIA "+ string(instance))
+
+            var _gx     = instance.x  div cell_size;
             var _gy     = instance.y div cell_size;
             var _start_index    = _gx + (_gy * grid_width);
 
@@ -169,7 +171,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             }
             else
             {
-                var angle = point_direction(instance.x, instance.y, next_x, next_y);
+                var angle   = point_direction(instance.x, instance.y, next_x, next_y);
                 instance.x += lengthdir_x(speed, angle);
                 instance.y += lengthdir_y(speed, angle);
             }
@@ -183,7 +185,6 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         print_timers : function ()
         {
             if (timers.printed) return;
-            if (visited_nodes == 0) return;
             if (!reached && !failure) return;
 
             var _t_init = (timers.t1 - timers.t0) / 1000;
@@ -332,17 +333,17 @@ function _path_builder(_struct)
     var _current_gx  = _struct.goal_gx;
     var _current_gy  = _struct.goal_gy;
 
-    var _current_index = _current_gx + (_current_gy * _grid_width);
+    var _current_index  = _current_gx + (_current_gy * _grid_width);
     var _parent_array   = _struct.parent;
 
     while (_parent_array[_current_index] != undefined)
     {
-        var node = { gx: _current_gx, gy: _current_gy };
+        var node        = { gx: _current_gx, gy: _current_gy };
         ds_list_add(_path, node);
 
-        _current_index = _parent_array[_current_index];
-        _current_gx   = _current_index mod _grid_width;
-        _current_gy   = _current_index div _grid_width;
+        _current_index  = _parent_array[_current_index];
+        _current_gx     = _current_index mod _grid_width;
+        _current_gy     = _current_index div _grid_width;
     }
     
     _struct.path        = _path;
@@ -355,9 +356,6 @@ function _step_by_step_runner(_struct)
 {
     var _instance       = _struct.instance;
     var _heuristic      = _struct.heuristic;
-
-    var _actual_gx      = _instance.x div _struct.cell_size;
-    var _actual_gy      = _instance.y div _struct.cell_size;
 
     var _dx_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_X_MANHATTAN : DIR_X_ALL;
     var _dy_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_Y_MANHATTAN : DIR_Y_ALL;
@@ -375,7 +373,7 @@ function _step_by_step_runner(_struct)
     var _parent         = _struct.parent;
     var _g_cost         = _struct.g_cost;
 
-    var _parent_node      = _struct.node;
+    var _parent_node    = _struct.node;
 
     if(!ds_priority_empty(_open_set))
     {
@@ -397,8 +395,8 @@ function _step_by_step_runner(_struct)
 
         for (var i = 0; i < _dir_count; i++)
         {
-            var _n_gx   = _current_gx + _dx_array[i];
-            var _n_gy   = _current_gy + _dy_array[i];
+            var _n_gx       = _current_gx + _dx_array[i];
+            var _n_gy       = _current_gy + _dy_array[i];
 
             if (_n_gx < 0 || _n_gx >= _grid_width || _n_gy < 0 || _n_gy >= _grid_height) continue;
 
@@ -452,9 +450,6 @@ function a_star_runner(_struct)
 
     var _instance       = _struct.instance;
     var _heuristic      = _struct.heuristic;
-
-    var _actual_gx      = _instance.x div _struct.cell_size;
-    var _actual_gy      = _instance.y div _struct.cell_size;
 
     var _dx_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_X_MANHATTAN : DIR_X_ALL;
     var _dy_array       = _heuristic == manhattan || _heuristic == manhattan_tie_breaker ? DIR_Y_MANHATTAN : DIR_Y_ALL;
@@ -544,17 +539,17 @@ function clear(_struct)
 {
     ds_priority_destroy(_struct.open_set);
 
-    _struct.grid        = undefined;
-    _struct.open_set    = undefined;
-    _struct.closed_set  = undefined;
-    _struct.g_cost      = undefined;
-    _struct.parent      = undefined;
-    _struct.node        = undefined;
-    _struct.path        = undefined;
-    _struct.f_cost      = 0;
-    _struct.reached     = false;
-    _struct.failure     = false;
-    _struct.visited_nodes  = 0;
+    _struct.grid            = undefined;
+    _struct.open_set        = undefined;
+    _struct.closed_set      = undefined;
+    _struct.g_cost          = undefined;
+    _struct.parent          = undefined;
+    _struct.node            = undefined;
+    _struct.path            = undefined;
+    _struct.f_cost          = 0;
+    _struct.reached         = false;
+    _struct.failure         = false;
+    _struct.visited_nodes   = 0;
 }
 
 /// @desc                           Fills the grid with the given instance, target, and obstacles.
@@ -564,7 +559,7 @@ function clear(_struct)
 /// @param {Real} cell_size         The size of each cell in the grid.
 function _grid_filler(_struct)
 {
-    _struct.timers.t2           = get_timer();
+    _struct.timers.t2       = get_timer();
     var _obstacles_count    = array_length(_struct.obstacles);
     var _cell_size          = _struct.cell_size;
     var _grid               = _struct.grid;
@@ -575,10 +570,10 @@ function _grid_filler(_struct)
     
     for (var i = 0; i < _obstacles_count; i++)
     {
-        var instance = _struct.obstacles[i];
+        var obstacle = _struct.obstacles[i];
 
-        if (instance == noone) continue;        
-        with (instance)
+        if (obstacle == noone) continue;        
+        with (obstacle)
         {   
             // Check if the sprite size matches the cell size
             if (sprite_width == _cell_size && sprite_height == _cell_size)

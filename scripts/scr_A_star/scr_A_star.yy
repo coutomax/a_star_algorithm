@@ -1,9 +1,9 @@
 {
   "$GMScript":"v1",
-  "%Name":"scr_A_star",
+  "%Name":"scr_a_star",
   "isCompatibility":false,
   "isDnD":false,
-  "name":"scr_A_star",
+  "name":"scr_a_star",
   "parent":{
     "name":"Scripts",
     "path":"folders/Scripts.yy",
