@@ -4,22 +4,165 @@
 #macro DIR_X_MANHATTAN [-1, 1, 0, 0]
 #macro DIR_Y_MANHATTAN [0, 0, -1, 1]
 
-/// @desc                   A* algorithm implementation for pathfinding in a grid-based environment.
-/// @param {Instance}       _instance Current instance that will be move towards the target.
-/// @param {Instance}       _target Target instance that the current instance will move towards.
-/// @param {Real}           _cell_size Size of each cell in the grid.
-/// @param {Array}          _obstacles Array of obstacle instances.
-/// @param {Boolean}        _active_debug Whether to enable debug messages.
-function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = manhattan)
+/// @desc                           Sets the properties of the grid used for A* pathfinding.
+/// @param {Real} _cell_size        Size of each cell in the grid.
+/// @param {Array} _obstacles       Array of obstacle instances.
+/// @param {Array} _exceptions      Array of instances to be ignored as obstacles.
+/// @returns {struct}               Returns a structure containing the grid properties and methods for A* pathfinding.
+function set_grid_properties(_cell_size = 32, _obstacles = [], _exceptions = [])
+{
+    #region Variable declarations and callable structure
+    g    =
+    { 
+        cell_size       : _cell_size,
+        obstacles       : _obstacles,
+        exceptions      : _exceptions,
+        grid            : undefined,
+        grid_width      : 0,
+        grid_height     : 0,
+
+        init           : function ()
+        {
+            var _status         = false;
+            var _total_cells    = 0;
+
+            if (cell_size <= 0)
+            {
+                show_debug_message("A* Error: Cell size must be greater than 0.");
+                return _status;
+            }
+
+            if (array_length(obstacles) == 0)
+            {
+                show_debug_message("No obstacles provided. The grid will be created without any obstacles.");
+            }
+
+            grid_width      = room_width div cell_size;
+            grid_height     = room_height div cell_size;
+
+            var _total_cells    = grid_width * grid_height;
+
+            // Initialize the data structures
+            grid        = array_create(_total_cells, 0);
+
+            return !_status;
+        },
+
+        // @desc Called when the grid needs to be created and filled with obstacles. Initializes the grid and fills it with the provided obstacles.
+        create_grid     : function ()
+        {
+            if (!init()) return;
+            
+            _grid_filler(self);
+
+            if (grid == undefined)
+            {
+                show_debug_message("A* Error: Grid is undefined.");
+                return;
+            }
+        },
+
+        // @desc Removes an instance from the grid, marking its occupied cells as empty.
+        remove_instance     : function (_instance = noone)
+        {
+            if (_instance == noone) return;
+            
+            var _real_width  = sprite_get_width(_instance.sprite_index) * abs(_instance.image_xscale);
+            var _real_height = sprite_get_height(_instance.sprite_index) * abs(_instance.image_yscale);
+
+            if (_real_width == cell_size && _real_height == cell_size)
+            {
+                var _gx;
+                var _x_adjust   = _instance.x;
+                if (array_length(exceptions) > 0 && array_contains(exceptions, _instance.object_index))
+                {
+                    _x_adjust   = (_instance.image_xscale < 0) ? (_instance.x - cell_size) : _instance.x;
+                }
+                
+                _gx             = _x_adjust div cell_size;
+                var _gy         = _instance.y div cell_size;
+                var _index      = _gx + (_gy * grid_width);
+
+                grid[_index]    = 0;
+            }
+            else
+            {   
+                // If the sprite size is larger than the cell size, mark all cells covered by the sprite as empty
+                var _width  = _real_width div cell_size;
+                var _height = _real_height div cell_size;
+
+                for (var _x = 0; _x < _width; _x++)
+                {
+                    for (var _y = 0; _y < _height; _y++)
+                    {
+                        var _gx;
+                        var _x_adjust   = _instance.x;
+                        if (array_length(exceptions) > 0 && array_contains(exceptions, _instance.object_index))
+                        {
+                            _x_adjust   = (_instance.image_xscale < 0) ? (_instance.x - cell_size) : _instance.x;
+                        }
+                        
+                        _gx             = (_x_adjust + (_x * cell_size)) div cell_size;
+                        var _gy         = (_instance.y + (_y * cell_size)) div cell_size;
+                        var _index      = _gx + (_gy * grid_width);
+
+                        grid[_index]    = 0;
+                    }
+                }    
+            }       
+        },
+        
+        // @desc Called on Draw Event. Draws the grid.
+        draw_grid    : function (color = c_white)
+        {
+            draw_set_color(color);
+
+            for (var _x = 0; _x < grid_width; _x++)
+            {
+                draw_line(_x * cell_size, 0, _x * cell_size, room_height);
+                for (var _y = 0; _y < grid_height; _y++)
+                {
+                    draw_line(0, _y * cell_size, room_width, _y * cell_size);
+                }
+            }
+        },
+
+        // @desc Draws the coordinates of each cell in the grid.
+        draw_coordinates : function (color = c_white)
+        {
+            draw_set_color(color);
+
+            for (var _x = 0; _x < grid_width; _x++)
+            {
+                for (var _y = 0; _y < grid_height; _y++)
+                {
+                    var _gx = _x;
+                    var _gy = _y;
+                    var _x_pos = _gx * cell_size + cell_size / 2;
+                    var _y_pos = _gy * cell_size + cell_size / 2;
+                    draw_text_transformed(_x_pos - cell_size / 2, _y_pos - cell_size / 2, string(_gx) + "," + string(_gy), .6, .6, 1);
+                }
+            }
+        },
+    }
+    #endregion
+
+    return g;
+}
+
+/// @desc                           A* algorithm implementation for pathfinding in a grid-based environment.
+/// @param {struct} _grid           The grid properties structure containing the grid and its dimensions.
+/// @param {function} _heuristic    The heuristic function to be used for pathfinding (default is manhattan_tie_breaker).
+/// @returns {struct}               Returns a structure containing methods and properties for executing the A* algorithm.
+function a_star(_grid = undefined, _heuristic = manhattan_tie_breaker)
 {
     #region Variable declarations and callable structure
     a   =
-    { 
-        instance        : _instance,
-        target          : _target,
-        cell_size       : _cell_size,
-        obstacles       : _obstacles,
+    {
+        instance        : noone,
+        target          : noone,
         heuristic       : _heuristic,
+        grid_properties : _grid,
         grid            : undefined,
         open_set        : undefined,
         closed_set      : undefined,
@@ -33,6 +176,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
         visited_nodes   : 0,
         goal_gx         : 0,
         goal_gy         : 0,
+        cell_size       : 0,
         reached         : false,
         failure         : false,
         timers          :
@@ -55,24 +199,6 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             var _status         = false;
             var _total_cells    = 0;
 
-            if (instance == noone || target == noone) 
-            {
-                show_debug_message("A* Error: Instance or target is noone.");
-                return _status;
-            }
-
-            if (cell_size <= 0)
-            {
-                show_debug_message("A* Error: Cell size must be greater than 0.");
-                return _status;
-            }
-
-            if (instance == target)
-            {
-                show_debug_message("A* Error: Instance and target are the same.");
-                return _status;
-            }
-
             if (heuristic == undefined)
             {
                 show_debug_message("A* Error: Heuristic function is undefined.");
@@ -85,25 +211,50 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
                 return _status;
             }
 
-            if (array_length(obstacles) == 0)
+            if (grid_properties == undefined)
             {
-                show_debug_message("No obstacles provided. The grid will be created without any obstacles.");
-            }      
+                show_debug_message("A* Error: Grid is undefined.");
+                return _status;
+            }
 
-            grid_width      = room_width div cell_size;
-            grid_height     = room_height div cell_size;
+            if (grid_properties.cell_size <= 0)
+            {
+                show_debug_message("A* Error: Cell size must be greater than 0.");
+                return _status;
+            }
+
+            if (instance == noone)
+            {
+                show_debug_message("A* Error: Instance is undefined.");
+                return _status;
+            }
+
+            if (target == noone)
+            {
+                show_debug_message("A* Error: Target is undefined.");
+                return _status;
+            }
+
+            if (instance == target)
+            {
+                show_debug_message("A* Error: Instance and target are the same.");
+                return _status;
+            }
+
+            cell_size       = grid_properties.cell_size;
+            grid            = grid_properties.grid;
+            grid_width      = grid_properties.grid_width;
+            grid_height     = grid_properties.grid_height;
 
             var _total_cells    = grid_width * grid_height;
             var INF             = 1000000000; // A large value to represent infinity
 
             // Initialize the data structures
             open_set    = ds_priority_create();
-            grid        = array_create(_total_cells, 0);
+
             closed_set  = array_create(_total_cells, false);
             parent      = array_create(_total_cells, undefined);
             g_cost      = array_create(_total_cells, INF);
-
-            show_debug_message("INSTANCIA "+ string(instance))
 
             var _gx     = instance.x  div cell_size;
             var _gy     = instance.y div cell_size;
@@ -119,25 +270,48 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
 
             return !_status;
         },
-        
-        // @desc Called when the A* algorithm is created. Initializes the grid and fills it with obstacles.
-        on_create    : function ()
-        {
-            if (!init()) return;
 
-            timers.t1   = get_timer();
-        
-            _grid_filler(self);
+        // @desc Adds an instance and its target to the A* algorithm for pathfinding.
+        add_instances : function (_instance = noone, _target = noone)
+        {
+            instance    = _instance;
+            target      = _target;
+
+            return init();
+        },
+
+        // @desc Optional method to initialize the grid properties.
+        grid_init    : function ()
+        {
+            if (grid_properties == undefined) 
+            {
+                show_debug_message("A* Error: Grid properties are undefined.");
+                return;
+            }
+            
+            cell_size       = grid_properties.cell_size;
+            grid_width      = grid_properties.grid_width;
+            grid_height     = grid_properties.grid_height;
+        },
+
+        // @desc Changes the grid properties used by the A* algorithm.
+        change_grid : function (_grid = undefined)
+        {
+            if (_grid == undefined) return;
+
+            grid_properties = _grid;
+            grid_init();
+            return init();
         },
 
         // @desc Called on Step Event. Steps through the A* algorithm until the target is reached or no path is found.
-        on_step     : function ()
+        path_finder     : function ()
         {
             if (instance == noone || target == noone) return;
             if (open_set == undefined || ds_priority_empty(open_set)) return;
             if (reached) return;
 
-            a_star_runner(self);            
+            _a_star_runner(self);            
         },
         
         // @desc Called when the A* algorithm is activated. Steps through the algorithm one step at a time.
@@ -150,6 +324,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             _step_by_step_runner(self);
         },
 
+        // @desc Moves the instance along the calculated path towards the target at the specified speed.
         move_instance : function (speed = 1)
         {
             if (instance == noone || target == noone) return;
@@ -182,6 +357,7 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             }
         },
 
+        // @desc Prints the timing information for the A* algorithm's execution, including initialization, grid creation, A* execution, and path building times.
         print_timers : function ()
         {
             if (timers.printed) return;
@@ -209,17 +385,21 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             clear(self);
         },
 
-        // @desc Called on Draw Event. Draws the grid.
-        draw_grid    : function (color = c_white)
+        // @desc Draws the obstacles in the grid, highlighting the cells that are occupied by obstacles.
+        draw_obstacles    : function (color = c_red)
         {
-            draw_set_color(color);
+            if (grid == undefined) return;
 
-            for (var _x = 0; _x < grid_width; _x++)
-            {
-                draw_line(_x * cell_size, 0, _x * cell_size, room_height);
-                for (var _y = 0; _y < grid_height; _y++)
-                {
-                    draw_line(0, _y * cell_size, room_width, _y * cell_size);
+            for (var _gx = 0; _gx < grid_width; _gx++) {
+                for (var _gy = 0; _gy < grid_height; _gy++) {
+                    var _idx = _gx + (_gy * grid_width);
+                    
+                    if (grid[_idx] != 0) {
+                        draw_set_color(c_red);
+                        draw_set_alpha(0.4);
+                        draw_rectangle(_gx * 32, _gy * 32, (_gx + 1) * 32, (_gy + 1) * 32, false);
+                        draw_set_alpha(1);
+                    }
                 }
             }
         },
@@ -268,24 +448,6 @@ function a_star(_instance, _target, _cell_size, _obstacles = [], _heuristic = ma
             }
 
             draw_set_alpha(1);
-        },
-
-        // @desc Draws the coordinates of each cell in the grid.
-        draw_coordinates : function (color = c_white)
-        {
-            draw_set_color(color);
-
-            for (var _x = 0; _x < grid_width; _x++)
-            {
-                for (var _y = 0; _y < grid_height; _y++)
-                {
-                    var _gx = _x;
-                    var _gy = _y;
-                    var _x_pos = _gx * cell_size + cell_size / 2;
-                    var _y_pos = _gy * cell_size + cell_size / 2;
-                    draw_text_transformed(_x_pos - cell_size / 2, _y_pos - cell_size / 2, string(_gx) + "," + string(_gy), .6, .6, 1);
-                }
-            }
         },
 
         // @desc Draws the closed set in the grid.
@@ -444,7 +606,7 @@ function _step_by_step_runner(_struct)
 
 /// @desc           Executes the A* algorithm until completion, updating the open and closed sets.
 /// @param {any*}   _struct The structure containing data for the A* algorithm.
-function a_star_runner(_struct)
+function _a_star_runner(_struct)
 {
     _struct.timers.t4   = get_timer();
 
@@ -478,7 +640,7 @@ function a_star_runner(_struct)
         if (_current_gx == _goal_gx && _current_gy == _goal_gy)
         {
             _struct.reached = true;
-            timers.t5       = get_timer();
+            _struct.timers.t5       = get_timer();
             _path_builder(_struct);
             return;
         }
@@ -524,7 +686,7 @@ function a_star_runner(_struct)
     if (ds_priority_empty(_open_set) && !_struct.reached && !_struct.failure)
     {
         _struct.failure = true;
-        timers.t5       = get_timer();
+        _struct.timers.t5       = get_timer();
         return;
     }
 }
@@ -537,30 +699,49 @@ function a_star_runner(_struct)
 /// @param {any*}       _struct The structure containing data for the A* algorithm.
 function clear(_struct)
 {
+    if (_struct.open_set == undefined) return;
+    if (_struct.closed_set == undefined) return;
+
     ds_priority_destroy(_struct.open_set);
 
-    _struct.grid            = undefined;
-    _struct.open_set        = undefined;
-    _struct.closed_set      = undefined;
-    _struct.g_cost          = undefined;
-    _struct.parent          = undefined;
-    _struct.node            = undefined;
-    _struct.path            = undefined;
-    _struct.f_cost          = 0;
-    _struct.reached         = false;
-    _struct.failure         = false;
-    _struct.visited_nodes   = 0;
+    with(_struct)
+    {
+        var _total_cells    = grid_width * grid_height;
+        var INF             = 1000000000;
+
+        open_set    = ds_priority_create();
+
+        closed_set  = array_create(_total_cells, false);
+        parent      = array_create(_total_cells, undefined);
+        g_cost      = array_create(_total_cells, INF);
+
+        var _gx     = instance.x  div cell_size;
+        var _gy     = instance.y div cell_size;
+        var _start_index    = _gx + (_gy * grid_width);
+
+        ds_priority_add(open_set, _start_index, 0);
+
+        goal_gx        = target.x div cell_size;
+        goal_gy        = target.y div cell_size;
+
+        closed_set[_start_index]    = true;
+        g_cost[_start_index]        = 0;
+
+        node            = undefined;
+        path            = undefined;
+        f_cost          = 0;
+        reached         = false;
+        failure         = false;
+        visited_nodes   = 0;
+    }
 }
 
-/// @desc                           Fills the grid with the given instance, target, and obstacles.
-/// @param {Instance} instance      The instance to place in the grid.
-/// @param {Instance} target        The target instance to place in the grid.
-/// @param {Array} [obstacles]=[]   An array of obstacle instances to place in the grid.
-/// @param {Real} cell_size         The size of each cell in the grid.
+/// @desc                           Fills the grid with the given instance, target, and obstacles and updates the grid structure accordingly.
+/// @param {any*}                   _struct The structure containing data for the A* algorithm.
 function _grid_filler(_struct)
 {
-    _struct.timers.t2       = get_timer();
     var _obstacles_count    = array_length(_struct.obstacles);
+    var exceptions          = _struct.exceptions;
     var _cell_size          = _struct.cell_size;
     var _grid               = _struct.grid;
     var _grid_width         = _struct.grid_width;
@@ -572,31 +753,48 @@ function _grid_filler(_struct)
     {
         var obstacle = _struct.obstacles[i];
 
-        if (obstacle == noone) continue;        
+        if (!instance_exists(obstacle)) continue;
         with (obstacle)
         {   
+            var _real_width  = sprite_get_width(sprite_index) * abs(image_xscale);
+            var _real_height = sprite_get_height(sprite_index) * abs(image_yscale);
             // Check if the sprite size matches the cell size
-            if (sprite_width == _cell_size && sprite_height == _cell_size)
+            if (_real_width == _cell_size && _real_height == _cell_size)
             {
-                var _gx     = x div _cell_size;
-                var _gy     = y div _cell_size;
-                var _index  = _gx + (_gy * _grid_width);
+
+                var _gx;
+                var _x_adjust   = x;
+                if (array_length(exceptions) > 0 && array_contains(exceptions, object_index))
+                {
+                    _x_adjust   = (image_xscale < 0) ? (x - _cell_size) : x;
+                }
+                
+                _gx             = _x_adjust div _cell_size;
+                var _gy         = y div _cell_size;
+                var _index      = _gx + (_gy * _grid_width);
 
                 _grid[_index]    = object_index;
             }
             else
             {   
                 // If the sprite size is larger than the cell size, mark all cells covered by the sprite as obstacles
-                var _width  = sprite_width div _cell_size;
-                var _height = sprite_height div _cell_size;
+                var _width  = _real_width div _cell_size;
+                var _height = _real_height div _cell_size;
 
                 for (var _x = 0; _x < _width; _x++)
                 {
                     for (var _y = 0; _y < _height; _y++)
                     {
-                        var _gx     = (x + (_x * _cell_size)) div _cell_size;
-                        var _gy     = (y + (_y * _cell_size)) div _cell_size;
-                        var _index  = _gx + (_gy * _grid_width);
+                        var _gx;
+                        var _x_adjust   = x;
+                        if (array_length(exceptions) > 0 && array_contains(exceptions, object_index))
+                        {
+                            _x_adjust   = (image_xscale < 0) ? (x - _real_width - 1) : x;
+                        }
+                
+                        _gx             = (_x_adjust + (_x * _cell_size)) div _cell_size;
+                        var _gy         = (y + (_y * _cell_size)) div _cell_size;
+                        var _index      = _gx + (_gy * _grid_width);
 
                         _grid[_index]    = object_index;
                     }
@@ -604,7 +802,8 @@ function _grid_filler(_struct)
             }
         }
     }
-    _struct.timers.t3           = get_timer();
+
+    _struct.grid    = _grid;
 }
 
 #endregion

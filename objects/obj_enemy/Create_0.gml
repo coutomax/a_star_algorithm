@@ -1,7 +1,8 @@
 depth       = 1;
-
-toggle      = true;
 move_speed  = 4;
 
-a = a_star(self, obj_target, 32, [obj_wall], manhattan_tie_breaker);
-a.on_create();
+original_grid = variable_clone(global.grid);
+
+a = a_star(original_grid);
+
+a.add_instances(id, obj_target);
